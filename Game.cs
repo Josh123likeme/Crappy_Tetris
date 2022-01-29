@@ -17,6 +17,8 @@ namespace Tetris
         private Block activeBlock;
         private BlockType inactiveBlock;
 
+        private BlockType[] pendingBlocks = new BlockType[3];
+
         public int width;
         public int height;
 
@@ -47,17 +49,39 @@ namespace Tetris
 
             bool blockOut = false;
 
+            inactiveBlock = BlockType.NULL;
+
+            for (int i = 0; i < pendingBlocks.Length; i++)
+            {
+
+                pendingBlocks[i] = GetRandomBlockType();
+
+            }
+
             bool newRound = true;
 
-            while (blockOut == false)
+            bool hasSwapped = false;
+
+            while (!blockOut)
             {
 
                 RemoveDisplayedBlocks();
 
-                if (newRound == true)
+                if (newRound)
                 {
 
-                    activeBlock = SpawnNewBlock(BlockType.L);
+                    hasSwapped = false;
+
+                    activeBlock = SpawnNewBlock(pendingBlocks[0]);
+
+                    for (int i = 0; i < pendingBlocks.Length - 1; i++)
+                    {
+
+                        pendingBlocks[i] = pendingBlocks[i + 1];
+
+                    }
+
+                    pendingBlocks[pendingBlocks.Length - 1] = GetRandomBlockType();
 
                     newRound = false;
 
@@ -70,40 +94,70 @@ namespace Tetris
 
                 }
 
-                DisplayBoard();
+                DisplayBoard();       
 
-                ConsoleKey key = GetInput();
+                ButtonType key = GetInput();
 
                 switch (key)
                 {
 
-                    case ConsoleKey.LeftArrow:
+                    case ButtonType.LEFT:
 
-                        attemptMoveBlock(key);
+                        //move left
 
-                        break;
-
-                    case ConsoleKey.RightArrow:
-
-                        attemptMoveBlock(key);
+                        AttemptMoveBlock(key);
 
                         break;
 
-                    case ConsoleKey.DownArrow:
+                    case ButtonType.RIGHT:
+
+                        //move right
+
+                        AttemptMoveBlock(key);
+
+                        break;
+
+                    case ButtonType.SLAM:
 
                         //slam
 
+                        newRound = true; //TODO remove
+
                         break;
 
-                    case ConsoleKey.UpArrow:
+                    case ButtonType.SWAP:
 
                         //swap pieces
 
+                        if (hasSwapped) break;
+
+                        bool actualSwap = SwapBlock();
+
+                        if (!actualSwap)
+                        {
+
+                            activeBlock = SpawnNewBlock(pendingBlocks[0]);
+
+                            for (int i = 0; i < pendingBlocks.Length - 1; i++)
+                            {
+
+                                pendingBlocks[i] = pendingBlocks[i + 1];
+
+                            }
+
+                            pendingBlocks[pendingBlocks.Length - 1] = GetRandomBlockType();
+
+                        }
+
+                        hasSwapped = true;
+
                         break;
 
-                    case ConsoleKey.Spacebar:
+                    case ButtonType.ROTATE:
 
-                        //rotate piece
+                        //rotate block
+
+                        AttemptRotateBlock();
 
                         break;
 
@@ -116,28 +170,52 @@ namespace Tetris
         public Block SpawnNewBlock(BlockType blockType)
         {
 
-            return new Block(width / 2 - 1, 1, blockType);
+            return new Block(width / 2 - 1, 2, blockType);
 
         }
 
-        public BlockType GetRandomBlock()
+        public BlockType GetRandomBlockType()
         {
 
-            return (BlockType)Enum.GetValues(typeof(BlockType)).GetValue(random.Next(Enum.GetValues(typeof(BlockType)).Length));
+            BlockType blockType;
+
+            do
+            {
+
+                blockType = (BlockType)Enum.GetValues(typeof(BlockType)).GetValue(random.Next(Enum.GetValues(typeof(BlockType)).Length));
+
+            }
+            while (blockType == BlockType.NULL);
+
+            return blockType;
 
         }
 
-        public bool attemptMoveBlock(ConsoleKey key)
+        public bool IsWithinBounds(Vector vec)
+        {
+
+            if (vec.x < 0) return false;
+            if (vec.x > width - 1) return false;
+
+            if (vec.y < 0) return false;
+
+            return true;
+
+        }
+
+        public bool AttemptMoveBlock(ButtonType key)
         {
 
             Vector[] newVecs = new Vector[4];
 
+            Vector newOrigin = activeBlock.originLocation;
+
             switch (key)
             {
 
-                case ConsoleKey.LeftArrow:
+                case ButtonType.LEFT:
 
-                    
+                    newOrigin.x += -1;
 
                     for (int i = 0; i < 4; i++)
                     {
@@ -145,13 +223,15 @@ namespace Tetris
                         newVecs[i].x = activeBlock.segmentLocations[i].x - 1;
                         newVecs[i].y = activeBlock.segmentLocations[i].y;
 
-                        if (newVecs[i].x < 0) return false;
+                        if (!IsWithinBounds(newVecs[i])) return false;
 
                     }
 
                     break;
 
-                case ConsoleKey.RightArrow:
+                case ButtonType.RIGHT:
+
+                    newOrigin.x += 1;
 
                     for (int i = 0; i < 4; i++)
                     {
@@ -159,11 +239,53 @@ namespace Tetris
                         newVecs[i].x = activeBlock.segmentLocations[i].x + 1;
                         newVecs[i].y = activeBlock.segmentLocations[i].y;
 
-                        if (newVecs[i].x > width - 1) return false;
+                        if (!IsWithinBounds(newVecs[i])) return false;
 
                     }
 
                     break;
+
+            }
+
+            activeBlock.originLocation = newOrigin;
+
+            activeBlock.segmentLocations = newVecs;
+
+            return true;
+
+        }
+
+        public bool AttemptRotateBlock()
+        {
+
+            if (!activeBlock.blockType.IsRotatable()) return false;
+
+            Vector[] newVecs = new Vector[4];
+
+            for (int i = 0; i < 4; i++)
+            {
+
+                newVecs[i].x = activeBlock.segmentLocations[i].x;
+                newVecs[i].y = activeBlock.segmentLocations[i].y;
+
+            }
+
+            for (int i = 0; i < 4; i++)
+            {
+
+                newVecs[i].x -= activeBlock.originLocation.x;
+                newVecs[i].y -= activeBlock.originLocation.y;
+
+                int x = newVecs[i].x;
+                int y = newVecs[i].y;
+
+                newVecs[i].x = y;
+                newVecs[i].y = -x;
+
+                newVecs[i].x += activeBlock.originLocation.x;
+                newVecs[i].y += activeBlock.originLocation.y;
+
+                if (!IsWithinBounds(newVecs[i])) return false;
 
             }
 
@@ -173,8 +295,37 @@ namespace Tetris
 
         }
 
+        public bool SwapBlock()
+        {
+
+            if (inactiveBlock == BlockType.NULL)
+            {
+
+                inactiveBlock = activeBlock.blockType;
+
+                return false;
+
+            }
+
+            else
+            {
+
+                BlockType oldActive = activeBlock.blockType;
+
+                activeBlock = SpawnNewBlock(inactiveBlock);
+
+                inactiveBlock = oldActive;
+
+                return true;
+
+            }
+
+        }
+
         public void DisplayBoard()
-        {   
+        {
+
+            //board
 
             string boardDisplay = "";
 
@@ -237,7 +388,29 @@ namespace Tetris
 
             }
 
+            border += "\n";
+
+            for (int i = 0; i < width + 2; i++)
+            {
+
+                border += "██";
+
+            }
+
             boardDisplay += border + "\n";
+
+            string pendingDisplay = "██   " + ((inactiveBlock != BlockType.NULL) ? Enum.GetName(typeof(BlockType), inactiveBlock) + "   ██  " : "    ██  ");
+
+            foreach (BlockType blockType in pendingBlocks)
+            {
+
+                pendingDisplay += Enum.GetName(typeof(BlockType), blockType) + "  ";
+
+            }
+
+            pendingDisplay += "██";
+
+            boardDisplay += pendingDisplay;
 
             Console.Clear();
 
@@ -276,18 +449,53 @@ namespace Tetris
 
         }
 
-        public ConsoleKey GetInput()
+        public ButtonType GetInput()
         {
 
-            return Console.ReadKey().Key;
+            try
+            {
+
+                return keybinds[Console.ReadKey().Key];
+
+            }
+            catch (KeyNotFoundException)
+            {
+
+                return ButtonType.NULL;
+
+            }
 
         }
+
+        public enum ButtonType
+        {
+            NULL,
+            LEFT,
+            RIGHT,
+            SLAM,
+            SWAP,
+            ROTATE,
+
+        }
+
+        public static Dictionary<ConsoleKey, ButtonType> keybinds = new Dictionary<ConsoleKey, ButtonType>
+        {
+            {ConsoleKey.LeftArrow, ButtonType.LEFT },
+            {ConsoleKey.RightArrow, ButtonType.RIGHT },
+            {ConsoleKey.DownArrow, ButtonType.SLAM },
+            {ConsoleKey.UpArrow, ButtonType.SWAP },
+            {ConsoleKey.Spacebar, ButtonType.ROTATE },
+
+        };
+
     }
 
     public class Block
     {
 
         public Vector[] segmentLocations;
+
+        public Vector originLocation;
 
         public BlockType blockType;
 
@@ -298,15 +506,53 @@ namespace Tetris
 
             this.blockType = blockType;
 
+            this.originLocation = new Vector { x = 0, y = 0 };
+
             switch (blockType)
             {
 
                 case BlockType.L:
 
-                    segmentLocations[0] = new Vector { x = -1 , y = 1 };
-                    segmentLocations[1] = new Vector { x = -1, y = 0 };
+                    segmentLocations[0] = new Vector { x = -1, y = 0 };
+                    segmentLocations[1] = new Vector { x = -1, y = -1 };
+                    segmentLocations[2] = new Vector { x = 0, y = -1 };
+                    segmentLocations[3] = new Vector { x = 1, y = -1 };
+
+                    break;
+
+                case BlockType.J:
+
+                    segmentLocations[0] = new Vector { x = 1, y = 0 };
+                    segmentLocations[1] = new Vector { x = 1, y = -1 };
+                    segmentLocations[2] = new Vector { x = 0, y = -1 };
+                    segmentLocations[3] = new Vector { x = -1, y = -1 };
+
+                    break;
+
+                case BlockType.S:
+
+                    segmentLocations[0] = new Vector { x = -1, y = 1 };
+                    segmentLocations[1] = new Vector { x = 0, y = 1 };
                     segmentLocations[2] = new Vector { x = 0, y = 0 };
                     segmentLocations[3] = new Vector { x = 1, y = 0 };
+
+                    break;
+
+                case BlockType.Z:
+
+                    segmentLocations[0] = new Vector { x = 1, y = 1 };
+                    segmentLocations[1] = new Vector { x = 0, y = 1 };
+                    segmentLocations[2] = new Vector { x = 0, y = 0 };
+                    segmentLocations[3] = new Vector { x = -1, y = 0 };
+
+                    break;
+
+                case BlockType.I:
+
+                    segmentLocations[0] = new Vector { x = -1, y = 0 };
+                    segmentLocations[1] = new Vector { x = 0, y = 0 };
+                    segmentLocations[2] = new Vector { x = 1, y = 0 };
+                    segmentLocations[3] = new Vector { x = 2, y = 0 };
 
                     break;
 
@@ -318,6 +564,16 @@ namespace Tetris
                     segmentLocations[3] = new Vector { x = 1, y = 1 };
 
                     break;
+
+                case BlockType.T:
+
+                    segmentLocations[0] = new Vector { x = 0, y = 1 };
+                    segmentLocations[1] = new Vector { x = -1, y = 0 };
+                    segmentLocations[2] = new Vector { x = 0, y = 0 };
+                    segmentLocations[3] = new Vector { x = 1, y = 0 };
+
+                    break;
+
             }
 
             for (int i = 0; i < 4; i++)
@@ -326,7 +582,12 @@ namespace Tetris
                 segmentLocations[i].x += originX;
                 segmentLocations[i].y += originY;
 
+                
+
             }
+
+            originLocation.x += originX;
+            originLocation.y += originY;
 
         }
 
@@ -334,14 +595,28 @@ namespace Tetris
 
     public enum BlockType
     {
-
+        NULL,
         L,
-        L_BACKWARDS,
+        J,
         S,
         Z,
         I,
         O,
         T,
+
+    }
+
+    public static class EnumExtensions
+    {
+
+        public static bool IsRotatable(this BlockType blockType)
+        {
+
+            if (blockType == BlockType.O) return false;
+
+            return true;
+
+        }
 
     }
 
