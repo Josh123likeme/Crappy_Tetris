@@ -72,16 +72,7 @@ namespace Tetris
 
                     hasSwapped = false;
 
-                    activeBlock = SpawnNewBlock(pendingBlocks[0]);
-
-                    for (int i = 0; i < pendingBlocks.Length - 1; i++)
-                    {
-
-                        pendingBlocks[i] = pendingBlocks[i + 1];
-
-                    }
-
-                    pendingBlocks[pendingBlocks.Length - 1] = GetRandomBlockType();
+                    InitiateNewRound();
 
                     newRound = false;
 
@@ -136,16 +127,7 @@ namespace Tetris
                         if (!actualSwap)
                         {
 
-                            activeBlock = SpawnNewBlock(pendingBlocks[0]);
-
-                            for (int i = 0; i < pendingBlocks.Length - 1; i++)
-                            {
-
-                                pendingBlocks[i] = pendingBlocks[i + 1];
-
-                            }
-
-                            pendingBlocks[pendingBlocks.Length - 1] = GetRandomBlockType();
+                            InitiateNewRound();
 
                         }
 
@@ -164,6 +146,22 @@ namespace Tetris
                 }
 
             }
+
+        }
+
+        public void InitiateNewRound()
+        {
+
+            activeBlock = SpawnNewBlock(pendingBlocks[0]);
+
+            for (int i = 0; i < pendingBlocks.Length - 1; i++)
+            {
+
+                pendingBlocks[i] = pendingBlocks[i + 1];
+
+            }
+
+            pendingBlocks[pendingBlocks.Length - 1] = GetRandomBlockType();
 
         }
 
@@ -325,8 +323,6 @@ namespace Tetris
         public void DisplayBoard()
         {
 
-            //board
-
             string boardDisplay = "";
 
             string border = "";
@@ -408,7 +404,14 @@ namespace Tetris
 
             }
 
-            pendingDisplay += "██";
+            pendingDisplay += "██\n";
+
+            for (int i = 0; i < 12; i++)
+            {
+
+                pendingDisplay += "██";
+
+            }
 
             boardDisplay += pendingDisplay;
 
